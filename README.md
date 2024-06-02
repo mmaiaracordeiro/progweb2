@@ -1,2 +1,2 @@
 # progweb2
-segundo trabalho individual 
+segundo trabalho individual da disciplina de programação web
