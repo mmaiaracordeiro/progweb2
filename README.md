@@ -1,4 +1,4 @@
-# mime-db
+# on-finished
 
 [![NPM Version][npm-version-image]][npm-url]
 [![NPM Downloads][npm-downloads-image]][npm-url]
@@ -6,95 +6,157 @@
 [![Build Status][ci-image]][ci-url]
 [![Coverage Status][coveralls-image]][coveralls-url]
 
-This is a large database of mime types and information about them.
-It consists of a single, public JSON file and does not include any logic,
-allowing it to remain as un-opinionated as possible with an API.
-It aggregates data from the following sources:
+Execute a callback when a HTTP request closes, finishes, or errors.
 
-- http://www.iana.org/assignments/media-types/media-types.xhtml
-- http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types
-- http://hg.nginx.org/nginx/raw-file/default/conf/mime.types
+## Install
 
-## Installation
+This is a [Node.js](https://nodejs.org/en/) module available through the
+[npm registry](https://www.npmjs.com/). Installation is done using the
+[`npm install` command](https://docs.npmjs.com/getting-started/installing-npm-packages-locally):
 
-```bash
-npm install mime-db
+```sh
+$ npm install on-finished
 ```
 
-### Database Download
-
-If you're crazy enough to use this in the browser, you can just grab the
-JSON file using [jsDelivr](https://www.jsdelivr.com/). It is recommended to
-replace `master` with [a release tag](https://github.com/jshttp/mime-db/tags)
-as the JSON format may change in the future.
-
-```
-https://cdn.jsdelivr.net/gh/jshttp/mime-db@master/db.json
-```
-
-## Usage
+## API
 
 ```js
-var db = require('mime-db')
-
-// grab data on .js files
-var data = db['application/javascript']
+var onFinished = require('on-finished')
 ```
 
-## Data Structure
+### onFinished(res, listener)
 
-The JSON file is a map lookup for lowercased mime types.
-Each mime type has the following properties:
+Attach a listener to listen for the response to finish. The listener will
+be invoked only once when the response finished. If the response finished
+to an error, the first argument will contain the error. If the response
+has already finished, the listener will be invoked.
 
-- `.source` - where the mime type is defined.
-    If not set, it's probably a custom media type.
-    - `apache` - [Apache common media types](http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types)
-    - `iana` - [IANA-defined media types](http://www.iana.org/assignments/media-types/media-types.xhtml)
-    - `nginx` - [nginx media types](http://hg.nginx.org/nginx/raw-file/default/conf/mime.types)
-- `.extensions[]` - known extensions associated with this mime type.
-- `.compressible` - whether a file of this type can be gzipped.
-- `.charset` - the default charset associated with this type, if any.
+Listening to the end of a response would be used to close things associated
+with the response, like open files.
 
-If unknown, every property could be `undefined`.
+Listener is invoked as `listener(err, res)`.
 
-## Contributing
+<!-- eslint-disable handle-callback-err -->
 
-To edit the database, only make PRs against `src/custom-types.json` or
-`src/custom-suffix.json`.
+```js
+onFinished(res, function (err, res) {
+  // clean up open fds, etc.
+  // err contains the error if request error'd
+})
+```
 
-The `src/custom-types.json` file is a JSON object with the MIME type as the
-keys and the values being an object with the following keys:
+### onFinished(req, listener)
 
-- `compressible` - leave out if you don't know, otherwise `true`/`false` to
-  indicate whether the data represented by the type is typically compressible.
-- `extensions` - include an array of file extensions that are associated with
-  the type.
-- `notes` - human-readable notes about the type, typically what the type is.
-- `sources` - include an array of URLs of where the MIME type and the associated
-  extensions are sourced from. This needs to be a [primary source](https://en.wikipedia.org/wiki/Primary_source);
-  links to type aggregating sites and Wikipedia are _not acceptable_.
+Attach a listener to listen for the request to finish. The listener will
+be invoked only once when the request finished. If the request finished
+to an error, the first argument will contain the error. If the request
+has already finished, the listener will be invoked.
 
-To update the build, run `npm run build`.
+Listening to the end of a request would be used to know when to continue
+after reading the data.
 
-### Adding Custom Media Types
+Listener is invoked as `listener(err, req)`.
 
-The best way to get new media types included in this library is to register
-them with the IANA. The community registration procedure is outlined in
-[RFC 6838 section 5](http://tools.ietf.org/html/rfc6838#section-5). Types
-registered with the IANA are automatically pulled into this library.
+<!-- eslint-disable handle-callback-err -->
 
-If that is not possible / feasible, they can be added directly here as a
-"custom" type. To do this, it is required to have a primary source that
-definitively lists the media type. If an extension is going to be listed as
-associateed with this media type, the source must definitively link the
-media type and extension as well.
+```js
+var data = ''
 
-[ci-image]: https://badgen.net/github/checks/jshttp/mime-db/master?label=ci
-[ci-url]: https://github.com/jshttp/mime-db/actions?query=workflow%3Aci
-[coveralls-image]: https://badgen.net/coveralls/c/github/jshttp/mime-db/master
-[coveralls-url]: https://coveralls.io/r/jshttp/mime-db?branch=master
-[node-image]: https://badgen.net/npm/node/mime-db
+req.setEncoding('utf8')
+req.on('data', function (str) {
+  data += str
+})
+
+onFinished(req, function (err, req) {
+  // data is read unless there is err
+})
+```
+
+### onFinished.isFinished(res)
+
+Determine if `res` is already finished. This would be useful to check and
+not even start certain operations if the response has already finished.
+
+### onFinished.isFinished(req)
+
+Determine if `req` is already finished. This would be useful to check and
+not even start certain operations if the request has already finished.
+
+## Special Node.js requests
+
+### HTTP CONNECT method
+
+The meaning of the `CONNECT` method from RFC 7231, section 4.3.6:
+
+> The CONNECT method requests that the recipient establish a tunnel to
+> the destination origin server identified by the request-target and,
+> if successful, thereafter restrict its behavior to blind forwarding
+> of packets, in both directions, until the tunnel is closed.  Tunnels
+> are commonly used to create an end-to-end virtual connection, through
+> one or more proxies, which can then be secured using TLS (Transport
+> Layer Security, [RFC5246]).
+
+In Node.js, these request objects come from the `'connect'` event on
+the HTTP server.
+
+When this module is used on a HTTP `CONNECT` request, the request is
+considered "finished" immediately, **due to limitations in the Node.js
+interface**. This means if the `CONNECT` request contains a request entity,
+the request will be considered "finished" even before it has been read.
+
+There is no such thing as a response object to a `CONNECT` request in
+Node.js, so there is no support for one.
+
+### HTTP Upgrade request
+
+The meaning of the `Upgrade` header from RFC 7230, section 6.1:
+
+> The "Upgrade" header field is intended to provide a simple mechanism
+> for transitioning from HTTP/1.1 to some other protocol on the same
+> connection.
+
+In Node.js, these request objects come from the `'upgrade'` event on
+the HTTP server.
+
+When this module is used on a HTTP request with an `Upgrade` header, the
+request is considered "finished" immediately, **due to limitations in the
+Node.js interface**. This means if the `Upgrade` request contains a request
+entity, the request will be considered "finished" even before it has been
+read.
+
+There is no such thing as a response object to a `Upgrade` request in
+Node.js, so there is no support for one.
+
+## Example
+
+The following code ensures that file descriptors are always closed
+once the response finishes.
+
+```js
+var destroy = require('destroy')
+var fs = require('fs')
+var http = require('http')
+var onFinished = require('on-finished')
+
+http.createServer(function onRequest (req, res) {
+  var stream = fs.createReadStream('package.json')
+  stream.pipe(res)
+  onFinished(res, function () {
+    destroy(stream)
+  })
+})
+```
+
+## License
+
+[MIT](LICENSE)
+
+[ci-image]: https://badgen.net/github/checks/jshttp/on-finished/master?label=ci
+[ci-url]: https://github.com/jshttp/on-finished/actions/workflows/ci.yml
+[coveralls-image]: https://badgen.net/coveralls/c/github/jshttp/on-finished/master
+[coveralls-url]: https://coveralls.io/r/jshttp/on-finished?branch=master
+[node-image]: https://badgen.net/npm/node/on-finished
 [node-url]: https://nodejs.org/en/download
-[npm-downloads-image]: https://badgen.net/npm/dm/mime-db
-[npm-url]: https://npmjs.org/package/mime-db
-[npm-version-image]: https://badgen.net/npm/v/mime-db
+[npm-downloads-image]: https://badgen.net/npm/dm/on-finished
+[npm-url]: https://npmjs.org/package/on-finished
+[npm-version-image]: https://badgen.net/npm/v/on-finished
