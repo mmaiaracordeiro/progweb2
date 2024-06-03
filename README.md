@@ -1,81 +1,100 @@
-# media-typer
+# mime-db
 
-[![NPM Version][npm-image]][npm-url]
-[![NPM Downloads][downloads-image]][downloads-url]
-[![Node.js Version][node-version-image]][node-version-url]
-[![Build Status][travis-image]][travis-url]
-[![Test Coverage][coveralls-image]][coveralls-url]
+[![NPM Version][npm-version-image]][npm-url]
+[![NPM Downloads][npm-downloads-image]][npm-url]
+[![Node.js Version][node-image]][node-url]
+[![Build Status][ci-image]][ci-url]
+[![Coverage Status][coveralls-image]][coveralls-url]
 
-Simple RFC 6838 media type parser
+This is a large database of mime types and information about them.
+It consists of a single, public JSON file and does not include any logic,
+allowing it to remain as un-opinionated as possible with an API.
+It aggregates data from the following sources:
+
+- http://www.iana.org/assignments/media-types/media-types.xhtml
+- http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types
+- http://hg.nginx.org/nginx/raw-file/default/conf/mime.types
 
 ## Installation
 
-```sh
-$ npm install media-typer
+```bash
+npm install mime-db
 ```
 
-## API
+### Database Download
+
+If you're crazy enough to use this in the browser, you can just grab the
+JSON file using [jsDelivr](https://www.jsdelivr.com/). It is recommended to
+replace `master` with [a release tag](https://github.com/jshttp/mime-db/tags)
+as the JSON format may change in the future.
+
+```
+https://cdn.jsdelivr.net/gh/jshttp/mime-db@master/db.json
+```
+
+## Usage
 
 ```js
-var typer = require('media-typer')
+var db = require('mime-db')
+
+// grab data on .js files
+var data = db['application/javascript']
 ```
 
-### typer.parse(string)
+## Data Structure
 
-```js
-var obj = typer.parse('image/svg+xml; charset=utf-8')
-```
+The JSON file is a map lookup for lowercased mime types.
+Each mime type has the following properties:
 
-Parse a media type string. This will return an object with the following
-properties (examples are shown for the string `'image/svg+xml; charset=utf-8'`):
+- `.source` - where the mime type is defined.
+    If not set, it's probably a custom media type.
+    - `apache` - [Apache common media types](http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types)
+    - `iana` - [IANA-defined media types](http://www.iana.org/assignments/media-types/media-types.xhtml)
+    - `nginx` - [nginx media types](http://hg.nginx.org/nginx/raw-file/default/conf/mime.types)
+- `.extensions[]` - known extensions associated with this mime type.
+- `.compressible` - whether a file of this type can be gzipped.
+- `.charset` - the default charset associated with this type, if any.
 
- - `type`: The type of the media type (always lower case). Example: `'image'`
+If unknown, every property could be `undefined`.
 
- - `subtype`: The subtype of the media type (always lower case). Example: `'svg'`
+## Contributing
 
- - `suffix`: The suffix of the media type (always lower case). Example: `'xml'`
+To edit the database, only make PRs against `src/custom-types.json` or
+`src/custom-suffix.json`.
 
- - `parameters`: An object of the parameters in the media type (name of parameter always lower case). Example: `{charset: 'utf-8'}`
+The `src/custom-types.json` file is a JSON object with the MIME type as the
+keys and the values being an object with the following keys:
 
-### typer.parse(req)
+- `compressible` - leave out if you don't know, otherwise `true`/`false` to
+  indicate whether the data represented by the type is typically compressible.
+- `extensions` - include an array of file extensions that are associated with
+  the type.
+- `notes` - human-readable notes about the type, typically what the type is.
+- `sources` - include an array of URLs of where the MIME type and the associated
+  extensions are sourced from. This needs to be a [primary source](https://en.wikipedia.org/wiki/Primary_source);
+  links to type aggregating sites and Wikipedia are _not acceptable_.
 
-```js
-var obj = typer.parse(req)
-```
+To update the build, run `npm run build`.
 
-Parse the `content-type` header from the given `req`. Short-cut for
-`typer.parse(req.headers['content-type'])`.
+### Adding Custom Media Types
 
-### typer.parse(res)
+The best way to get new media types included in this library is to register
+them with the IANA. The community registration procedure is outlined in
+[RFC 6838 section 5](http://tools.ietf.org/html/rfc6838#section-5). Types
+registered with the IANA are automatically pulled into this library.
 
-```js
-var obj = typer.parse(res)
-```
+If that is not possible / feasible, they can be added directly here as a
+"custom" type. To do this, it is required to have a primary source that
+definitively lists the media type. If an extension is going to be listed as
+associateed with this media type, the source must definitively link the
+media type and extension as well.
 
-Parse the `content-type` header set on the given `res`. Short-cut for
-`typer.parse(res.getHeader('content-type'))`.
-
-### typer.format(obj)
-
-```js
-var obj = typer.format({type: 'image', subtype: 'svg', suffix: 'xml'})
-```
-
-Format an object into a media type string. This will return a string of the
-mime type for the given object. For the properties of the object, see the
-documentation for `typer.parse(string)`.
-
-## License
-
-[MIT](LICENSE)
-
-[npm-image]: https://img.shields.io/npm/v/media-typer.svg?style=flat
-[npm-url]: https://npmjs.org/package/media-typer
-[node-version-image]: https://img.shields.io/badge/node.js-%3E%3D_0.6-brightgreen.svg?style=flat
-[node-version-url]: http://nodejs.org/download/
-[travis-image]: https://img.shields.io/travis/jshttp/media-typer.svg?style=flat
-[travis-url]: https://travis-ci.org/jshttp/media-typer
-[coveralls-image]: https://img.shields.io/coveralls/jshttp/media-typer.svg?style=flat
-[coveralls-url]: https://coveralls.io/r/jshttp/media-typer
-[downloads-image]: https://img.shields.io/npm/dm/media-typer.svg?style=flat
-[downloads-url]: https://npmjs.org/package/media-typer
+[ci-image]: https://badgen.net/github/checks/jshttp/mime-db/master?label=ci
+[ci-url]: https://github.com/jshttp/mime-db/actions?query=workflow%3Aci
+[coveralls-image]: https://badgen.net/coveralls/c/github/jshttp/mime-db/master
+[coveralls-url]: https://coveralls.io/r/jshttp/mime-db?branch=master
+[node-image]: https://badgen.net/npm/node/mime-db
+[node-url]: https://nodejs.org/en/download
+[npm-downloads-image]: https://badgen.net/npm/dm/mime-db
+[npm-url]: https://npmjs.org/package/mime-db
+[npm-version-image]: https://badgen.net/npm/v/mime-db
