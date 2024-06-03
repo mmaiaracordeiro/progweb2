@@ -1,24 +1,78 @@
-'use strict'
-/* eslint-env mocha */
-/* eslint no-proto: 0 */
-var assert = require('assert')
-var setPrototypeOf = require('..')
+/*!
+ * escape-html
+ * Copyright(c) 2012-2013 TJ Holowaychuk
+ * Copyright(c) 2015 Andreas Lubbe
+ * Copyright(c) 2015 Tiancheng "Timothy" Gu
+ * MIT Licensed
+ */
 
-describe('setProtoOf(obj, proto)', function () {
-  it('should merge objects', function () {
-    var obj = { a: 1, b: 2 }
-    var proto = { b: 3, c: 4 }
-    var mergeObj = setPrototypeOf(obj, proto)
+'use strict';
 
-    if (Object.getPrototypeOf) {
-      assert.strictEqual(Object.getPrototypeOf(obj), proto)
-    } else if ({ __proto__: [] } instanceof Array) {
-      assert.strictEqual(obj.__proto__, proto)
-    } else {
-      assert.strictEqual(obj.a, 1)
-      assert.strictEqual(obj.b, 2)
-      assert.strictEqual(obj.c, 4)
+/**
+ * Module variables.
+ * @private
+ */
+
+var matchHtmlRegExp = /["'&<>]/;
+
+/**
+ * Module exports.
+ * @public
+ */
+
+module.exports = escapeHtml;
+
+/**
+ * Escape special characters in the given string of html.
+ *
+ * @param  {string} string The string to escape for inserting into HTML
+ * @return {string}
+ * @public
+ */
+
+function escapeHtml(string) {
+  var str = '' + string;
+  var match = matchHtmlRegExp.exec(str);
+
+  if (!match) {
+    return str;
+  }
+
+  var escape;
+  var html = '';
+  var index = 0;
+  var lastIndex = 0;
+
+  for (index = match.index; index < str.length; index++) {
+    switch (str.charCodeAt(index)) {
+      case 34: // "
+        escape = '&quot;';
+        break;
+      case 38: // &
+        escape = '&amp;';
+        break;
+      case 39: // '
+        escape = '&#39;';
+        break;
+      case 60: // <
+        escape = '&lt;';
+        break;
+      case 62: // >
+        escape = '&gt;';
+        break;
+      default:
+        continue;
     }
-    assert.strictEqual(mergeObj, obj)
-  })
-})
+
+    if (lastIndex !== index) {
+      html += str.substring(lastIndex, index);
+    }
+
+    lastIndex = index + 1;
+    html += escape;
+  }
+
+  return lastIndex !== index
+    ? html + str.substring(lastIndex, index)
+    : html;
+}
