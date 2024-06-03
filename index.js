@@ -1,13 +1,10 @@
-const express = require("express")
-const bodyParser = require("body-parser")
-const bookRoutes = require("./routes/books.js")
+/**
+ * Detect Electron renderer process, which is node, but we should
+ * treat as a browser.
+ */
 
-const app = express()
-const port = 3000
-
-app.use(bodyParser.json())
-app.use("/books", bookRoutes)
-
-app.listen(port, () => {
-    console.log(`API rodando em http://localhost:${port}`)
-})
+if (typeof process !== 'undefined' && process.type === 'renderer') {
+  module.exports = require('./browser.js');
+} else {
+  module.exports = require('./node.js');
+}
